@@ -1638,7 +1638,17 @@ namespace AvalonDock
 				Dispatcher.BeginInvoke(new Action(() =>
 				{
 					if (newFW.Content != null || (newFW.Model as LayoutAnchorableFloatingWindow)?.IsVisible == true)
-						newFW.Show();
+					{
+						// FORCE Technology
+						try
+						{
+							newFW.Show();
+						}
+						catch (InvalidOperationException)
+						{
+
+						}
+					}
 					else
 						newFW.Hide();
 				}), DispatcherPriority.Send);
