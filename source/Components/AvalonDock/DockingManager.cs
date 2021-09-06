@@ -203,13 +203,33 @@ namespace AvalonDock
 					if (fw.Model is LayoutAnchorableFloatingWindow window && window.RootPanel.IsMaximized)
 					{
 						fw.WindowState = WindowState.Normal;
-						fw.Show();
+
+						// FORCE Technology
+						try
+						{
+							fw.Show();
+						}
+						catch (InvalidOperationException)
+						{
+
+						}
+
 						fw.WindowState = WindowState.Maximized;
 					}
 					else
 					{
 						if (fw.Content != null || (fw.Model as LayoutAnchorableFloatingWindow)?.IsVisible == true)
-							fw.Show();
+						{
+							// FORCE Technology
+							try
+							{
+								fw.Show();
+							}
+							catch (InvalidOperationException)
+							{
+
+							}
+						}
 						else
 							fw.Hide();
 					}
@@ -1917,6 +1937,18 @@ namespace AvalonDock
 		{
 			base.OnApplyTemplate();
 			_autohideArea = GetTemplateChild("PART_AutoHideArea") as FrameworkElement;
+		}
+
+		protected override void OnPreviewGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
+		{
+			// FORCE Technology: Fixed issue where MenuItem inside LayoutAnchorable causes null exception on menuSite.
+			if (e.NewFocus is TabItem)
+			{
+				e.Handled = true;
+				return;
+			}
+
+			base.OnPreviewGotKeyboardFocus(e);
 		}
 
 		protected override Size ArrangeOverride(Size arrangeBounds)
