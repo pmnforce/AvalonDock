@@ -598,13 +598,14 @@ namespace AvalonDock.Layout
 
 		private void UpdateParentVisibility()
 		{
-			// Element is Hidden since it has no parent but a previous parent
-			if (PreviousContainer != null && Parent == null)
-			{
-				// Go back to using previous parent
-				Parent = PreviousContainer;
-				////        PreviousContainer = null;
-			}
+			// Commented out by FORCE Technology.
+			//// Element is Hidden since it has no parent but a previous parent
+			//if (PreviousContainer != null && Parent == null)
+			//{
+			//	// Go back to using previous parent
+			//	Parent = PreviousContainer;
+			//	////        PreviousContainer = null;
+			//}
 
 			if (Parent is ILayoutElementWithVisibility parentPane)
 				parentPane.ComputeVisibility();
