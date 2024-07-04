@@ -1,4 +1,4 @@
-﻿/************************************************************************
+/************************************************************************
    AvalonDock
 
    Copyright (C) 2007-2013 Xceed Software Inc.
@@ -155,13 +155,13 @@ namespace AvalonDock.Layout
 
 				XmlSerializer serializer;
 				if (reader.LocalName.Equals(nameof(LayoutAnchorablePaneGroup)))
-					serializer = new XmlSerializer(typeof(LayoutAnchorablePaneGroup));
+					serializer = XmlSerializersCache.GetSerializer<LayoutAnchorablePaneGroup>();
 				else
 				{
 					var type = LayoutRoot.FindType(reader.LocalName);
 					if (type == null)
 						throw new ArgumentException("AvalonDock.LayoutAnchorableFloatingWindow doesn't know how to deserialize " + reader.LocalName);
-					serializer = new XmlSerializer(type);
+					serializer = XmlSerializersCache.GetSerializer(type);
 				}
 				RootPanel = (LayoutAnchorablePaneGroup)serializer.Deserialize(reader);
 			}

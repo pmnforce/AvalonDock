@@ -1,4 +1,4 @@
-﻿/************************************************************************
+/************************************************************************
    AvalonDock
 
    Copyright (C) 2007-2013 Xceed Software Inc.
@@ -60,6 +60,8 @@ namespace AvalonDock.Layout.Serialization
 
 		protected virtual void FixupLayout(LayoutRoot layout)
 		{
+			foreach (var element in layout.Descendents().OfType<LayoutElement>()) element.FixCachedRootOnDeserialize();
+
 			//fix container panes
 			foreach (var lcToAttach in layout.Descendents().OfType<ILayoutPreviousContainer>().Where(lc => lc.PreviousContainerId != null))
 			{
@@ -76,6 +78,9 @@ namespace AvalonDock.Layout.Serialization
 				if (lcToFix.ContentId != null)
 					previousAchorable = _previousAnchorables.FirstOrDefault(a => a.ContentId == lcToFix.ContentId);
 
+				if (previousAchorable != null && previousAchorable.Title != null)
+					lcToFix.Title = previousAchorable.Title;
+
 				if (LayoutSerializationCallback != null)
 				{
 					// Ask client application via callback if item should be deserialized
@@ -86,10 +91,10 @@ namespace AvalonDock.Layout.Serialization
 					else if (args.Content != null)
 						lcToFix.Content = args.Content;
 					else if (args.Model.Content != null)
-						lcToFix.Hide(false);           // hide layoutanchorable if client app supplied no content
+						lcToFix.HideAnchorable(false);   // hide layoutanchorable if client app supplied no content
 				}
 				else if (previousAchorable == null)  // No Callback and no provious document -> skip this
-					lcToFix.Hide(false);
+					lcToFix.HideAnchorable(false);
 				else
 				{   // No Callback but previous anchoreable available -> load content from previous document
 					lcToFix.Content = previousAchorable.Content;

@@ -7,8 +7,6 @@
    License (Ms-PL) as published at https://opensource.org/licenses/MS-PL
  ************************************************************************/
 
-using AvalonDock.Layout;
-using AvalonDock.Themes;
 using System;
 using System.ComponentModel;
 using System.Linq;
@@ -21,6 +19,9 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+
+using AvalonDock.Layout;
+using AvalonDock.Themes;
 
 namespace AvalonDock.Controls
 {
@@ -218,7 +219,21 @@ namespace AvalonDock.Controls
 		protected override void OnStateChanged(EventArgs e)
 		{
 			if (!_isInternalChange)
-				UpdateMaximizedState(WindowState == WindowState.Maximized);
+			{
+				if (WindowState == WindowState.Maximized)
+				{
+					// Forward external changes to WindowState from any state to a new Maximized state
+					// to the LayoutFloatingWindowControl internal representation.
+					UpdateMaximizedState(true);
+				}
+				else if (IsMaximized && OwnedByDockingManagerWindow)
+				{
+					// Override any external changes to WindowState when owned and in Maximized state.
+					// This override fixes the issue of an owned LayoutFloatingWindowControl loosing
+					// its Maximized state when the owner window is restored from a Minimized state.
+					WindowState = WindowState.Maximized;
+				}
+			}
 
 			base.OnStateChanged(e);
 		}
@@ -334,6 +349,7 @@ namespace AvalonDock.Controls
 			}
 			else
 			{
+				CaptureMouse();
 				var windowHandle = new WindowInteropHelper(this).Handle;
 				var lParam = new IntPtr(((int)Left & 0xFFFF) | ((int)Top << 16));
 				Win32Helper.SendMessage(windowHandle, Win32Helper.WM_NCLBUTTONDOWN, new IntPtr(Win32Helper.HT_CAPTION), lParam);
@@ -347,16 +363,7 @@ namespace AvalonDock.Controls
 			switch (msg)
 			{
 				case Win32Helper.WM_ACTIVATE:
-					if (((int)wParam & 0xFFFF) == Win32Helper.WA_INACTIVE)
-					{
-						if (lParam == this.GetParentWindowHandle())
-						{
-							Win32Helper.SetActiveWindow(_hwndSrc.Handle);
-							handled = true;
-						}
-					}
 					UpdateWindowsSizeBasedOnMinSize();
-
 					break;
 
 				case Win32Helper.WM_EXITSIZEMOVE:
@@ -364,7 +371,7 @@ namespace AvalonDock.Controls
 
 					if (_dragService != null)
 					{
-						var mousePosition = this.TransformToDeviceDPI(Win32Helper.GetMousePosition());
+						var mousePosition = (Win32Helper.GetMousePosition());
 						_dragService.Drop(mousePosition, out var dropFlag);
 						_dragService = null;
 						SetIsDragging(false);
@@ -535,6 +542,26 @@ namespace AvalonDock.Controls
 			base.OnInitialized(e);
 		}
 
+		protected override void OnClosing(CancelEventArgs e)
+		{
+			base.OnClosing(e);
+			AssureOwnerIsNotMinimized();
+		}
+
+		/// <summary>
+		/// Prevents a known bug in WPF, which wronlgy minimizes the parent window, when closing this control
+		/// </summary>
+		private void AssureOwnerIsNotMinimized()
+		{
+			try
+			{
+				Owner?.Activate();
+			}
+			catch (Exception)
+			{
+			}
+		}
+
 		#endregion Overrides
 
 		#region Private Methods
@@ -606,13 +633,24 @@ namespace AvalonDock.Controls
 			var windowHandle = new WindowInteropHelper(this).Handle;
 			var mousePosition = this.PointToScreenDPI(Mouse.GetPosition(this));
 
+			var area = this.GetScreenArea();
+
 			// BugFix Issue #6
 			// This code is initializes the drag when content (document or toolwindow) is dragged
 			// A second chance back up plan if DragDelta is not set
 			if (DragDelta == default) DragDelta = new Point(3, 3);
 			Left = mousePosition.X - DragDelta.X;                 // BugFix Issue #6
 			Top = mousePosition.Y - DragDelta.Y;
+
+			if (this.GetScreenArea().Size != area.Size) // setting the top/left co-ordinates has changed the size - this means moving to a screen with a different DPI. Recalculate mouse position based on new DPI to avoid wrong drag location
+			{
+				mousePosition = this.PointToScreenDPI(Mouse.GetPosition(this));
+				Left = mousePosition.X - DragDelta.X;
+				Top = mousePosition.Y - DragDelta.Y;
+			}
+
 			_attachDrag = false;
+			Show();
 			var lParam = new IntPtr(((int)mousePosition.X & 0xFFFF) | ((int)mousePosition.Y << 16));
 			Win32Helper.SendMessage(windowHandle, Win32Helper.WM_NCLBUTTONDOWN, new IntPtr(Win32Helper.HT_CAPTION), lParam);
 		}
@@ -657,7 +695,7 @@ namespace AvalonDock.Controls
 				_dragService = new DragService(this);
 				SetIsDragging(true);
 			}
-			var mousePosition = this.TransformToDeviceDPI(Win32Helper.GetMousePosition());
+			var mousePosition = (Win32Helper.GetMousePosition());
 			_dragService.UpdateMouseLocation(mousePosition);
 		}
 

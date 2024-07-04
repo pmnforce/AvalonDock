@@ -1,4 +1,4 @@
-﻿/************************************************************************
+/************************************************************************
    AvalonDock
 
    Copyright (C) 2007-2013 Xceed Software Inc.
@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Windows.Controls;
 using System.Windows.Markup;
@@ -98,9 +99,19 @@ namespace AvalonDock.Layout
 			{
 				if (_rootPanel == value) return;
 				RaisePropertyChanging(nameof(RootPanel));
+				var activeContent = ActiveContent;
+				var activeRoot = activeContent?.Root;
 				if (_rootPanel != null && _rootPanel.Parent == this) _rootPanel.Parent = null;
 				_rootPanel = value ?? new LayoutPanel(new LayoutDocumentPane());
 				_rootPanel.Parent = this;
+				if (ActiveContent == null && activeRoot == this && activeContent != null)
+				{
+					ActiveContent = activeContent;
+					if (ActiveContent != activeContent)
+					{
+						ActiveContent = activeContent;
+					}
+				}
 				RaisePropertyChanged(nameof(RootPanel));
 			}
 		}
@@ -643,9 +654,19 @@ namespace AvalonDock.Layout
 
 		internal static Type FindType(string name)
 		{
-			foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-				foreach (var type in assembly.GetTypes())
-					if (type.Name.Equals(name)) return type;
+			var avalonAssembly = Assembly.GetAssembly(typeof(LayoutRoot));
+
+			foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().OrderBy(a => a != avalonAssembly))
+				try
+				{
+					foreach (var type in assembly.GetTypes())
+						if (type.Name.Equals(name))
+							return type;
+				}
+				catch (ReflectionTypeLoadException)
+				{
+				}
+
 			return null;
 		}
 
@@ -885,47 +906,47 @@ namespace AvalonDock.Layout
 			while (reader.NodeType == XmlNodeType.Whitespace) reader.Read();
 			if (reader.NodeType == XmlNodeType.EndElement) return null;
 
-			XmlSerializer serializer;
+			Type typeToSerialize;
 			switch (reader.LocalName)
 			{
 				case nameof(LayoutAnchorablePaneGroup):
-					serializer = new XmlSerializer(typeof(LayoutAnchorablePaneGroup));
+					typeToSerialize = typeof(LayoutAnchorablePaneGroup);
 					break;
 
 				case nameof(LayoutAnchorablePane):
-					serializer = new XmlSerializer(typeof(LayoutAnchorablePane));
+					typeToSerialize = typeof(LayoutAnchorablePane);
 					break;
 
 				case nameof(LayoutAnchorable):
-					serializer = new XmlSerializer(typeof(LayoutAnchorable));
+					typeToSerialize = typeof(LayoutAnchorable);
 					break;
 
 				case nameof(LayoutDocumentPaneGroup):
-					serializer = new XmlSerializer(typeof(LayoutDocumentPaneGroup));
+					typeToSerialize = typeof(LayoutDocumentPaneGroup);
 					break;
 
 				case nameof(LayoutDocumentPane):
-					serializer = new XmlSerializer(typeof(LayoutDocumentPane));
+					typeToSerialize = typeof(LayoutDocumentPane);
 					break;
 
 				case nameof(LayoutDocument):
-					serializer = new XmlSerializer(typeof(LayoutDocument));
+					typeToSerialize = typeof(LayoutDocument);
 					break;
 
 				case nameof(LayoutAnchorGroup):
-					serializer = new XmlSerializer(typeof(LayoutAnchorGroup));
+					typeToSerialize = typeof(LayoutAnchorGroup);
 					break;
 
 				case nameof(LayoutPanel):
-					serializer = new XmlSerializer(typeof(LayoutPanel));
+					typeToSerialize = typeof(LayoutPanel);
 					break;
 
 				case nameof(LayoutDocumentFloatingWindow):
-					serializer = new XmlSerializer(typeof(LayoutDocumentFloatingWindow));
+					typeToSerialize = typeof(LayoutDocumentFloatingWindow);
 					break;
 
 				case nameof(LayoutAnchorableFloatingWindow):
-					serializer = new XmlSerializer(typeof(LayoutAnchorableFloatingWindow));
+					typeToSerialize = typeof(LayoutAnchorableFloatingWindow);
 					break;
 
 				case nameof(LeftSide):
@@ -940,13 +961,12 @@ namespace AvalonDock.Layout
 					return reader.Read();
 
 				default:
-					var type = FindType(reader.LocalName);
-					if (type == null)
+					typeToSerialize = FindType(reader.LocalName);
+					if (typeToSerialize == null)
 						throw new ArgumentException("AvalonDock.LayoutRoot doesn't know how to deserialize " + reader.LocalName);
-					serializer = new XmlSerializer(type);
 					break;
 			}
-
+			XmlSerializer serializer = XmlSerializersCache.GetSerializer(typeToSerialize);
 			return serializer.Deserialize(reader);
 		}
 
